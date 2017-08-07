@@ -1,10 +1,5 @@
-## Writeup Template
 
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
-
----
-
-**Advanced Lane Finding Project**
+# Advanced Lane Finding Project
 
 The goals / steps of this project are the following:
 
@@ -23,21 +18,11 @@ The goals / steps of this project are the following:
 [distortion-2]: ./output_images/distortion-2.jpg
 [warped]: ./output_images/warped.jpg
 [pipeline]: ./output_images/pipeline.jpg
+[histogram]: ./output_images/histogram.jpg
 [windows]: ./output_images/windows.jpg
-
-[distortion]: ./output_images/distortion.jpg
-[distortion]: ./output_images/distortion.jpg
-
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[frame]: ./output_images/frame.jpg
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
-
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
 ---
 
@@ -46,8 +31,6 @@ The goals / steps of this project are the following:
 All the code can be found in the IPython notebook located in `Advanced Lane Lines.ipynb`.
 
 ### Camera Calibration
-
-#### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
 In order to calibrate the camera I have to find the corners of the chessboard patterns. OpenCV needs to know the number of (inner) rows and columns. By simple inspection, I find that they are 9 and 6 respectively. There are 3 images where not all the corners are visible. For simplicity I can just skip them.
 
