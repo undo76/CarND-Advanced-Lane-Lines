@@ -19,7 +19,14 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/undistort_output.png "Undistorted"
+[distortion]: ./output_images/distortion.jpg
+[distortion-2]: ./output_images/distortion-2.jpg
+[warped]: ./output_images/warped.jpg
+[pipeline]: ./output_images/pipeline.jpg
+
+[distortion]: ./output_images/distortion.jpg
+[distortion]: ./output_images/distortion.jpg
+
 [image2]: ./test_images/test1.jpg "Road Transformed"
 [image3]: ./examples/binary_combo_example.jpg "Binary Example"
 [image4]: ./examples/warped_straight_lines.jpg "Warp Example"
@@ -35,37 +42,104 @@ The goals / steps of this project are the following:
 
 ### Writeup / README
 
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
-
-You're reading it!
+All the code can be found in the IPython notebook located in `Advanced Lane Lines.ipynb`.
 
 ### Camera Calibration
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
+In order to calibrate the camera I have to find the corners of the chessboard patterns. OpenCV needs to know the number of (inner) rows and columns. By simple inspection, I find that they are 9 and 6 respectively. There are 3 images where not all the corners are visible. For simplicity I can just skip them.
 
-I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
+``` python
+NX, NY = 9, 6
 
-I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
+def find_chessboards(calibration_imgs, nx, ny):
+    ret = []
+    for i, img in enumerate(calibration_imgs):
+        found, corners = cv2.findChessboardCorners(img, (nx, ny))
+        cv2.drawChessboardCorners(img, (nx, ny), corners, found)
+        if not found:
+            print("WARN: Chessboard not found for image {}. Skipping.".format(i))
+        else:
+            ret.append(corners)
+    return np.stack(ret)
+```
 
-![alt text][image1]
+OpenCV needs a mapping between the distorted points and the object points, in order to correct the camera distortion.
+
+``` python
+def undistort(objpoints, imgpoints, shape=(720, 1280)):
+    retval, cameraMatrix, distCoeffs, rvecs, tvecs = \
+        cv2.calibrateCamera(objpoints, imgpoints, tuple(reversed(shape)), None, None)
+    def apply(x):
+        return cv2.undistort(x, cameraMatrix, distCoeffs) 
+    return apply
+ 
+def create_objpoints(nx, ny):
+    return np.array(
+        [[[x, y, 0.] for y in range(6) for x in range(9)]] * len(imgpoints),
+        dtype=np.float32)
+```
+Applying these functions to the chessboards patterns, I obtain this result:
+
+![][distortion]
 
 ### Pipeline (single images)
 
-#### 1. Provide an example of a distortion-corrected image.
+#### 1. Correct the distortion
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+Using the parameters calculated in the previous step I correct the distortion of the car camera.
 
-#### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
+![][distortion-2]
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+#### 2. Apply the pipeline
+
+In order to find the points in the lane lines I tried several combinations of color-spaces, channels, sobel filters and thresholds. In order to facilitate this task, I used a functional style, that allows me to combine and compose the different elements of the pipeline easily. (Check the code for details).
+
+This is the final pipeline that I applied to the project:
+
+``` python
+pipeline = compose(
+    convert_color(cv2.COLOR_RGB2HLS),
+    
+    undistort(objpoints, imgpoints, shape=frame.shape[:-1]),
+    lambda x: cv2.warpPerspective(x, perspective_matrix, (1280, 720), flags=cv2.INTER_LINEAR),
+    
+    # It averages both paths of the fork in a final image
+    fork(
+        compose(
+            lambda x: x[..., 1], # Channel L  
+            sobel(1, 0, ksize=5),
+            scale(1.),
+            threshold(0.1, 1., value=.8)
+        ),
+        compose(
+            lambda x: x[..., 2], # Channel S  
+            threshold(100, 255, value=1.),
+        )
+    ),
+    
+    threshold(0.1, 1., 255),
+    lambda x: x.astype(np.uint8),
+
+    convert_color(cv2.COLOR_GRAY2RGB),
+)
+
+transformed = pipeline(undistorted)
+```
+
+The result of applying this pipeline to the road image is:
+
+![][pipeline]
+
+
+
 
 ![alt text][image3]
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
+![][warped]
 The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
 
 ```python
