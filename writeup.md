@@ -24,8 +24,6 @@ The goals / steps of this project are the following:
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
----
-
 ### Writeup / README
 
 All the code can be found in the IPython notebook located in `Advanced Lane Lines.ipynb`.
@@ -83,28 +81,19 @@ In order to find the points in the lane lines I tried several combinations of co
 This is the final pipeline that I applied to the project:
 
 ``` python
+undistorted = undistort(objpoints, imgpoints, shape=frame.shape[:-1])(frame)
+
+YELLOW = (np.uint8([20,40,80]), np.uint8([255,255, 255]))
+WHITE = (np.uint8([0,200,0]), np.uint8([255,255,255]))
+
 pipeline = compose(
     convert_color(cv2.COLOR_RGB2HLS),
     
-    undistort(objpoints, imgpoints, shape=frame.shape[:-1]),
     lambda x: cv2.warpPerspective(x, perspective_matrix, (1280, 720), flags=cv2.INTER_LINEAR),
     
-    # It averages both paths of the fork in a final image
-    fork(
-        compose(
-            lambda x: x[..., 1], # Channel L  
-            sobel(1, 0, ksize=5),
-            scale(1.),
-            threshold(0.1, 1., value=.8)
-        ),
-        compose(
-            lambda x: x[..., 2], # Channel S  
-            threshold(100, 255, value=1.),
-        )
-    ),
-    
-    threshold(0.1, 1., 255),
-    lambda x: x.astype(np.uint8),
+    lambda x: np.maximum(inRange(*YELLOW)(x), inRange(*WHITE)(x)),
+    sobel(1, 0, ksize=5),
+    scale(255),
 
     convert_color(cv2.COLOR_GRAY2RGB),
 )
@@ -193,7 +182,7 @@ Once I have the starting points, I use the method of sliding windows to find the
 
 ``` python
 def update_windows(img, peak, prev_medians=None, n_windows=12, margin=90, max_dx=10, plot_points=False):
-    dst = np.zeros_like(img)
+    dst = np.zeros_like(img) 
     h = img.shape[0] // n_windows
     points = []
     new_medians = []
@@ -212,8 +201,7 @@ def update_windows(img, peak, prev_medians=None, n_windows=12, margin=90, max_dx
             dx = median - start_x
             median = start_x + np.clip(dx, -max_dx, +max_dx)
             new_medians.append(median)
-            plot_window(dst, pts, start, h, margin, median, found, plot_points)  
-            
+            plot_window(dst, pts, start, h, margin, median, found, plot_points)              
         else:
             median = start_x
             new_medians.append(None)
@@ -224,9 +212,10 @@ def update_windows(img, peak, prev_medians=None, n_windows=12, margin=90, max_dx
         curv = calculate_curvature(points, img.shape[0])
         plot_road_lane(dst, x, y, margin)
     else:
+        y, x = None, None
         curv = 0
         
-    return new_medians, curv, dst
+    return new_medians, curv, dst, (y, x)
 ```
 
 Then, I fit the points found using a 2nd-degree polynomy. I use the fitted points to plot, the road. I repeat this fitting, but using world coordinates, as it is not a lineal transformation. This is the result of applying this steps to a frame:
@@ -260,13 +249,11 @@ This is a frame extracted from the video
 
 ![][frame]
 
----
 
 ### Pipeline (video)
 
 Here's a [link to my video result](./project-video-result.mp4)
 
----
 
 ### Discussion
 
